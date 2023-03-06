@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "@prisma/client": "^4.9.0",
+    "iconv-lite": "^0.6.3",
+    "image-downloader": "^4.3.0",
+    "papaparse": "^5.3.2",
+    "pg": "^8.8.0",
+    "puppeteer": "^19.5.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^4.9.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

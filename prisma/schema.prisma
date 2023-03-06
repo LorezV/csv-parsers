@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:admin@localhost:5432/merlion?connection_timeout=15"
+}
+
+model Description {
+  id                   Int                    @id(map: "Descriptions_pk") @unique(map: "Descriptions_description_id_key") @default(autoincrement())
+  text                 String
+  language_id          Int
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Language             Language               @relation(fields: [language_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "description_language_id")
+  Product              Product[]
+}
+
+enum DocumentTypeEnum {
+  IMAGE
+  FILE
+}
+
+model Document {
+  id                   Int                    @id(map: "Documents_pk") @unique(map: "Documents_image_id_key") @default(autoincrement())
+  url                  String
+  type                 DocumentTypeEnum       @default(IMAGE)
+  name                 String
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+}
+
+model Language {
+  id                   Int                    @id(map: "Language_pk") @unique(map: "Language_language_id_key") @default(autoincrement())
+  language             String
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Description          Description[]
+}
+
+model Vendor {
+  id                   Int                    @id(map: "Vendors_pk") @unique(map: "Vendors_vendor_id_key") @default(autoincrement())
+  name                 String                 @unique(map: "Vendors_vendor_name_key")
+  document_id          Int?                   @unique
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Model                Model[]
+  Product              Product[]
+}
+
+model Model {
+  id                   Int                    @id(map: "Models_pk") @unique(map: "Models_model_id_key") @default(autoincrement())
+  name                 String
+  vendor_id            Int?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  ModelProduct         ModelProduct[]
+  Vendor               Vendor?                @relation(fields: [vendor_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "model_vendor_id_fk")
+}
+
+model ModelProduct {
+  product_id           Int
+  model_id             Int
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Model                Model                  @relation(fields: [model_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "modelProdcut_model_id")
+  Product              Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "modelProdcut_prodcut_id")
+
+  @@id([product_id, model_id], map: "modelproduct_pk")
+}
+
+model Product {
+  id                   Int                    @id(map: "Products_pk") @unique(map: "Products_product_id_key") @default(autoincrement())
+  vendor_id            Int?
+  vendor_partnumber    String
+  name                 String
+  description_id       Int?
+  category_id          Int?
+  description          String?
+  document_id          Int[]
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  ModelProduct         ModelProduct[]
+  Description          Description?           @relation(fields: [description_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "product_description_id_fk")
+  Vendor               Vendor?                @relation(fields: [vendor_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "product_vendor_id_fk")
+  SupplierProductPrice SupplierProductPrice[]
+  CartProduct          CartProduct[]
+  Category             Category?              @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "product_category_id_fk")
+}
+
+model Currency {
+  id                   Int                    @id(map: "Currencies_pk") @unique(map: "Currencies_currency_id_key") @default(autoincrement())
+  name                 String?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  CurrencyRate         CurrencyRate[]
+  SupplierProductPrice SupplierProductPrice[]
+}
+
+model CurrencyRate {
+  currency_id          Int
+  rate                 Float?
+  date                 DateTime               @db.Timestamp(6)
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Currency             Currency               @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "currency_id")
+
+  @@id([currency_id, date], map: "currencyrate_pk")
+}
+
+model SupplierProductPrice {
+  product_id           Int
+  supplier_id          Int
+  price_date           DateTime               @db.Timestamp(6)
+  price                Float
+  supplier_partnumber  String?
+  currency_id          Int
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Currency             Currency?              @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "currency_id")
+  Product              Product                @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "product_id")
+  Supplier             Supplier               @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "supplier_id")
+
+  @@unique([supplier_id, supplier_partnumber])
+  @@id([product_id, supplier_id, price_date], map: "supplierproductprice_pk")
+}
+
+model Supplier {
+  id                   Int                    @id(map: "Suppliers_pk") @unique(map: "Suppliers_supplier_id_key") @default(autoincrement())
+  name                 String
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  SupplierProductPrice SupplierProductPrice[]
+  CartProduct          CartProduct[]
+  User                 User?
+}
+
+enum CartType {
+  CART
+  PRODUCT_WATCHLIST
+  SUPPLIER_WATCHLIST
+}
+
+model Cart {
+  id                   Int                    @id @default(autoincrement())
+  user_id              Int
+  name                 String
+  type                 CartType               @default(CART)
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  User                 User                   @relation(fields: [user_id], references: [id])
+  CartProducts         CartProduct[]
+
+  @@unique([id, user_id, type])
+}
+
+model CartProduct {
+  id                   Int                    @id @default(autoincrement())
+  cart_id              Int
+  product_id           Int?
+  quantity             Int                    @default(1)
+  supplier_id          Int?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Cart                 Cart                   @relation(fields: [cart_id], references: [id])
+  Product              Product?               @relation(fields: [product_id], references: [id])
+  Supplier             Supplier?              @relation(fields: [supplier_id], references: [id])
+
+  @@unique([cart_id, product_id])
+}
+
+model Category {
+  id                   Int                    @id @default(autoincrement())
+  name                 String
+  parent_id            Int?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Children             Category[]             @relation(name: "CategoryToCategory")
+  Parent               Category?              @relation(name: "CategoryToCategory", fields: [parent_id], references: [id])
+  Product              Product[]
+}
+
+model User {
+  id                   Int                    @id(map: "user_pk") @unique(map: "user_id_uindex") @default(autoincrement())
+  name                 String
+  user_name            String?                @unique
+  document_id          Int?                   @unique
+  supplier_id          Int?                   @unique
+  email                String                 @unique(map: "user_email_uindex")
+  password             String
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  Supplier             Supplier?              @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "supplier_id")
+  Cart                 Cart[]
+  Profile              Profile?
+  UserRole             UserRole[]
+}
+
+model Profile {
+  id                   Int                    @id @default(autoincrement())
+  user_id              Int                    @unique
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  User                 User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_id")
+}
+
+model UserRole {
+  id                   Int                    @id @default(autoincrement())
+  user_id              Int
+  role_name            RolesEnum              @default(USER)
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  deleted_at           DateTime?
+
+  User                 User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_id")
+
+  @@unique([user_id, role_name])
+}
+
+enum RolesEnum {
+  ADMIN
+  USER
+}
