@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:admin@localhost:5432/merlion?connection_timeout=15"
+  url      = env("DATABASE_URL")
 }
 
 model Description {
