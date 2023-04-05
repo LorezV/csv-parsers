@@ -57,7 +57,7 @@ async function parse() {
             const parts = temp.split(" ")
             if (parts.length > 1) {
               const candidate = parts[parts.length - 1]
-              const match = candidate.match(/^((?:[A-Z0-9]{6,})|(?:[0-9]{4,})|(?:[A-Z0-9\-]{6,})|(?:[0-9\-]{6,}))$/mi)
+              const match = candidate.match(/^((?:[A-Z0-9]{6,})|(?:[0-9]{6,})|(?:[A-Z0-9\-]{6,})|(?:[0-9\-]{6,}))$/mi)
               if (match) {
                 vendor_partnumber = match[1]
                 model = temp
