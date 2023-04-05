@@ -38,19 +38,37 @@ async function parse() {
           partnumber: data[5],
           name: data[6],
           price: parseFloat(data[10]),
-          model: data[32],
-          model2: data[37],
+          model: data[32].trim(),
+          model2: data[37].trim(),
         }
         parser.pause()
 
         await (async () => {
+          const brandRegexp = new RegExp(`(\\s|^)${result.brand}(\\s|&)`, "img")
+
+          if (!brandRegexp.test(result.name)) return
+          result.name = result.name.replace(brandRegexp, "").replace("  ", " ")
+
           if (result.model.length < 1 && result.model2.length < 1) return
-          const model = result.model.length > 0 ? result.model : result.model2
 
-          const regexp = new RegExp(`${result.brand}`, "is")
-          if (!result.name.match(regexp)) return
+          let vendor_partnumber; let model;
+          if (result.model.length > 0) {
+            let temp = result.model.replace(brandRegexp, "").replace("  ", " ").trim().replace("(", "").replace(")", "")
+            const parts = temp.split(" ")
+            if (parts.length > 1) {
+              const candidate = parts[parts.length - 1]
+              const match = candidate.match(/^((?:[A-Z0-9]{6,})|(?:[0-9]{4,})|(?:[A-Z0-9\-]{6,})|(?:[0-9\-]{6,}))$/mi)
+              if (match) {
+                vendor_partnumber = match[1]
+                model = temp
+              }
+            }
+          } else {
+            vendor_partnumber = result.model2
+            model = result.model2
+          }
 
-          result.name = result.name.replace(regexp, "").replace("  ", " ")
+          if (!vendor_partnumber || !model) return
 
           let categoryDB = uCategoryDB
           for (const cName of result.categoryString.split(",")) {
@@ -65,14 +83,14 @@ async function parse() {
           if (!vendorDB) vendorDB = await prisma.vendor.create({ data: { name: result.brand } })
 
           let productDB = await prisma.product.findFirst({where: {
-            vendor_partnumber: model
+            vendor_partnumber: result.partnumber
           }})
 
           if (!productDB) {
             productDB = await prisma.product.create({
               data: {
                 vendor_id: vendorDB.id,
-                vendor_partnumber: model,
+                vendor_partnumber: vendor_partnumber,
                 name: result.name,
                 category_id: categoryDB.id
               }
