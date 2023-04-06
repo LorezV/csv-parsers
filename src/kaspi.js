@@ -10,7 +10,8 @@ const prisma = new PrismaClient()
 
 async function parse() {
   const file = fs.createReadStream(path.join(__dirname, "../", "vendor", "kaspi.csv"))
-  let count = 0
+  let countModel1 = 0
+  let countModel2 = 0
 
   let supplierDB = await prisma.supplier.findFirst({where: {name: "Kaspi"}})
   if (!supplierDB) supplierDB = await prisma.supplier.create({data: { name: "Kaspi" }})
@@ -21,11 +22,8 @@ async function parse() {
   let languageDB = await prisma.language.findFirst({ where: { language: "eu" } })
   if (!languageDB) languageDB = await prisma.language.create({ data: { language: "eu" } })
 
-  let uCategoryDB = await prisma.category.findFirst({ where: { name: "unknown" } })
-  if (!uCategoryDB) uCategoryDB = await prisma.category.create({ data: { name: "unknown" } })
+  let uCategoryDB = await prisma.category.findUnique({where: { id: 337 }})
 
-  let c1 = 0
-  let c2 = 0
   await new Promise((resolve) => {
     papa.parse(file, {
       worker: true,
@@ -51,80 +49,64 @@ async function parse() {
 
           if (result.model.length < 1 && result.model2.length < 1) return
 
-          let vendor_partnumber; let model;
+          let vendor_partnumber; let model; let isModel2 = false;
           if (result.model.length > 0) {
             let temp = result.model.replace(brandRegexp, "").replace("  ", " ").trim().replace("(", "").replace(")", "")
             const parts = temp.split(" ")
             if (parts.length > 1) {
               const candidate = parts[parts.length - 1]
-              const match = candidate.match(/^((?:[A-Z0-9]{6,})|(?:[0-9]{6,})|(?:[A-Z0-9\-]{6,})|(?:[0-9\-]{6,}))$/mi)
+              const match = candidate.match(/(^| )[A-Za-z0-9\-А-Яа-я/]{4,}$/mig)
               if (match) {
-                vendor_partnumber = match[1]
+                vendor_partnumber = match[0].trim()
                 model = temp
+              } else {
+
               }
             }
           } else {
             vendor_partnumber = result.model2
             model = result.model2
+            isModel2 = true
           }
 
-          if (!vendor_partnumber || !model) return
-
-          let categoryDB = uCategoryDB
-          for (const cName of result.categoryString.split(",")) {
-            const catCandidate = await prisma.category.findFirst({where: { name: cName }})
-            if (catCandidate) {
-              categoryDB = catCandidate
-              break
-            }
-          }
-          
-          let vendorDB = await prisma.vendor.findFirst({ where: { name: result.brand } })
-          if (!vendorDB) vendorDB = await prisma.vendor.create({ data: { name: result.brand } })
+          if (!vendor_partnumber) return
 
           let productDB = await prisma.product.findFirst({where: {
-            vendor_partnumber: result.partnumber
+            vendor_partnumber: vendor_partnumber
           }})
 
-          if (!productDB) {
-            productDB = await prisma.product.create({
-              data: {
-                vendor_id: vendorDB.id,
-                vendor_partnumber: vendor_partnumber,
-                name: result.name,
-                category_id: categoryDB.id
-              }
-            })
-          }
-
-          
-          let supplierProductPriceDB = await prisma.supplierProductPrice.findFirst({
-            where: {
-              product_id: productDB.id,
-              supplier_id: supplierDB.id
-            }
-          })
-
-          if (supplierProductPriceDB) {
-            supplierProductPriceDB = await prisma.supplierProductPrice.create({
-              data: {
+          if (productDB) {
+            let supplierProductPriceDB = await prisma.supplierProductPrice.findFirst({
+              where: {
                 product_id: productDB.id,
-                supplier_id: supplierDB.id,
-                price_date: new Date(),
-                price: result.price,
-                supplier_partnumber: result.partnumber,
-                currency_id: currencyDB.id
+                supplier_id: supplierDB.id
               }
             })
-          }
+            
+            if (!supplierProductPriceDB) {
+              supplierProductPriceDB = await prisma.supplierProductPrice.create({
+                data: {
+                  product_id: productDB.id,
+                  supplier_id: supplierDB.id,
+                  price_date: new Date(),
+                  price: result.price,
+                  supplier_partnumber: result.partnumber,
+                  currency_id: currencyDB.id
+                }
+              })
 
-          console.log(`Parsed product id:${productDB.id}`)
+              console.log(`Parsed product id:${productDB.id}`)
+              if (isModel2) countModel2++
+              else countModel1++
+            }
+          }
 
         })()
 
         parser.resume()
       },
       complete: () => {
+        console.log(`Finded by model: ${countModel1}\nFinded by model2: ${countModel2}\nGeneral count: ${countModel1 + countModel2}`)
         resolve(true)
       }
     })
