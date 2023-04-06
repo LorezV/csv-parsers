@@ -16,13 +16,10 @@ async function parse() {
   let supplierDB = await prisma.supplier.findFirst({where: {name: "Kaspi"}})
   if (!supplierDB) supplierDB = await prisma.supplier.create({data: { name: "Kaspi" }})
 
-  let currencyDB = await prisma.currency.findFirst({ where: { name: "kzt" } });
-  if (!currencyDB) currencyDB = await prisma.currency.create({ data: { name: "kzt", CurrencyRate: { create: { rate: 1, date: new Date() } } } });
+  let currencyDB = await prisma.currency.findFirst({ where: { name: "usd" } });
 
   let languageDB = await prisma.language.findFirst({ where: { language: "eu" } })
   if (!languageDB) languageDB = await prisma.language.create({ data: { language: "eu" } })
-
-  let uCategoryDB = await prisma.category.findUnique({where: { id: 337 }})
 
   await new Promise((resolve) => {
     papa.parse(file, {
@@ -35,7 +32,7 @@ async function parse() {
           categoryString: data[1],
           partnumber: data[5],
           name: data[6],
-          price: parseFloat(data[10]),
+          price: parseFloat(data[10]) * 0.002226,
           model: data[32].trim(),
           model2: data[37].trim(),
         }
@@ -51,17 +48,11 @@ async function parse() {
 
           let vendor_partnumber; let model; let isModel2 = false;
           if (result.model.length > 0) {
-            let temp = result.model.replace(brandRegexp, "").replace("  ", " ").trim().replace("(", "").replace(")", "")
-            const parts = temp.split(" ")
-            if (parts.length > 1) {
-              const candidate = parts[parts.length - 1]
-              const match = candidate.match(/(^| )[A-Za-z0-9\-А-Яа-я/]{4,}$/mig)
-              if (match) {
-                vendor_partnumber = match[0].trim()
-                model = temp
-              } else {
-
-              }
+            let temp = result.model.replace(brandRegexp, "").trim().replace("(", "").replace(")", "")
+            const match = temp.match(/(^| )[A-Za-z0-9\-А-Яа-я\/-]+$/mig)
+            if (match) {
+              vendor_partnumber = match[0].trim()
+              model = temp
             }
           } else {
             vendor_partnumber = result.model2
