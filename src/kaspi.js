@@ -49,6 +49,9 @@ async function parse() {
           let vendor_partnumber; let model; let isModel2 = false;
           if (result.model.length > 0) {
             let temp = result.model.replace(brandRegexp, "").trim().replace("(", "").replace(")", "")
+            while (temp.includes("\"")) {
+              temp = temp.replace("\"", "")
+            }
             const match = temp.match(/(^| )[A-Za-z0-9\-А-Яа-я\/-]+$/mig)
             if (match) {
               vendor_partnumber = match[0].trim()
