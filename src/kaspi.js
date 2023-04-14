@@ -32,7 +32,7 @@ async function parse() {
           categoryString: data[1],
           partnumber: data[5],
           name: data[6],
-          price: parseFloat(data[10]) * 0.002226,
+          price: Math.ceil(parseFloat(data[10]) * 0.002226 * 100) / 100,
           model: data[32].trim(),
           model2: data[37].trim(),
         }

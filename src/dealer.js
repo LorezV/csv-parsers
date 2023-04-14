@@ -10,26 +10,28 @@ const prisma = new PrismaClient();
 
 async function parse() {
   const file = fs.createReadStream(
-    path.join(__dirname, "../", "vendor", "al-style.csv")
+    path.join(__dirname, "../", "vendor", "dealer.csv")
   );
   let count = 0;
   let countProducts = 0;
 
-  await prisma.$queryRaw`SELECT setval('"Product_id_seq"', (SELECT MAX(id) FROM "Product"));`
-  await prisma.$queryRaw`SELECT setval('"Description_id_seq"', (SELECT MAX(id) FROM "Description"));`
+  await prisma.$queryRaw`SELECT setval('"Product_id_seq"', (SELECT MAX(id) FROM "Product"));`;
+  await prisma.$queryRaw`SELECT setval('"Description_id_seq"', (SELECT MAX(id) FROM "Description"));`;
   await prisma.$queryRaw`SELECT setval('"Supplier_id_seq"', (SELECT MAX(id) FROM "Supplier"));`
 
   let supplierDB = await prisma.supplier.findFirst({
-    where: { name: "Al-Style" },
+    where: { name: "DEALER PRICE" },
   });
   if (!supplierDB) {
-    supplierDB = await prisma.supplier.create({ data: { name: "Al-Style" } });
+    supplierDB = await prisma.supplier.create({ data: { name: "DEALER PRICE" } });
   }
   let currencyDB = await prisma.currency.findFirst({ where: { name: "usd" } });
   if (!currencyDB) {
     currencyDB = await prisma.currency.create({ data: { name: "usd" } });
   }
-  let languageID = await prisma.language.findFirst({where: { language: "ru" }})
+  let languageID = await prisma.language.findFirst({
+    where: { language: "ru" },
+  });
   if (!languageID)
     languageID = await prisma.language.create({ data: { language: "ru" } });
 
@@ -39,6 +41,7 @@ async function parse() {
     process.exit(0);
   }
 
+  const vendorsDB = await prisma.vendor.findMany()
   const unknownVendorDB = await prisma.vendor.findFirst({where: {name: "Unknown"}})
 
   const r = await prisma.supplierProductPrice.deleteMany({
@@ -57,13 +60,10 @@ async function parse() {
         await (async () => {
           const result = {
             supplier_partnumber: data[0],
-            vendor_partnumber: data[1],
             title: data[2],
-            fullTitle: data[3],
-            price: data[4],
-            category: "",
-            vendor: "",
-            desc: ""
+            vendor_partnumber: data[3],
+            price: data[7],
+            vendor_id: null,
           };
 
           if (
@@ -71,67 +71,62 @@ async function parse() {
             !result.vendor_partnumber.length > 0 ||
             !result.price.length > 0 ||
             !data[0].match(/^[0-9]+$/gm)
-          ) return;
+          )
+            return;
 
-          result.price = Math.ceil(parseFloat(result.price) * 0.002206 * 100) / 100;
-          result.category = result.fullTitle.split(",")[0].trim()
-          result.vendor = (result.fullTitle.split(",")[1]?.trim())
-          result.desc = result.fullTitle.split(", ").slice(2).join(", ").trim()
+          result.title = result.title.split(",")[0]
+          result.price = parseFloat(result.price);
 
-          if (result.vendor) {
-            result.vendor = result.vendor.toUpperCase()
-          } else return
+          for (const vendor of vendorsDB) {
+            if (result.title.toLowerCase().includes(vendor.name.toLowerCase())) {
+              result.vendor_id = vendor.id
+            }
+          }
 
           let productDB = await prisma.product.findFirst({
             where: { vendor_partnumber: result.vendor_partnumber },
           });
           if (!productDB) {
-            const descriptionDB = await prisma.description.create({data: {
-              text: result.desc,
-              language_id: languageID.id
-            }})
-
             let categoryDB = await prisma.category.findFirst({
-              where: { name: result.category },
+              where: { name: "Unknown" },
             });
 
-            if (!categoryDB)
-              categoryDB = await prisma.category.findFirst({
-                where: { name: "Unknown" },
+            let vendorDB = undefined;
+            if (result.vendor_id) {
+              vendorDB = await prisma.vendor.findFirst({
+                where: { id: result.vendor_id },
               });
+            }
 
-            let vendorDB = await prisma.vendor.findFirst({
-              where: { name: result.vendor },
-            });
             if (!vendorDB) vendorDB = unknownVendorDB
-            
+
             productDB = await prisma.product.create({
               data: {
                 vendor_id: vendorDB.id,
                 vendor_partnumber: result.vendor_partnumber,
                 name: result.title,
-                category_id: categoryDB.id,
-                description_id: descriptionDB.id
+                category_id: categoryDB.id
               },
             });
 
-            countProducts++
+            countProducts++;
           }
 
           if (productDB) {
-            const supplierProductPrice = await prisma.supplierProductPrice.create({
-              data: {
-                product_id: productDB.id,
-                supplier_id: supplierDB.id,
-                price_date: new Date(),
-                price: result.price,
-                supplier_partnumber: result.supplier_partnumber,
-                currency_id: currencyDB.id
-              }
-            })
+            const supplierProductPrice =
+              await prisma.supplierProductPrice.create({
+                data: {
+                  product_id: productDB.id,
+                  supplier_id: supplierDB.id,
+                  price_date: new Date(),
+                  price: result.price,
+                  supplier_partnumber: result.supplier_partnumber,
+                  currency_id: currencyDB.id,
+                },
+              });
           }
 
-          count++
+          count++;
         })();
 
         parser.resume();
@@ -146,12 +141,12 @@ async function parse() {
 }
 
 async function main() {
-  await parse()
-  console.log("end")
-  await prisma.$disconnect()
+  await parse();
+  console.log("end");
+  await prisma.$disconnect();
 }
 
-main().catch(async e => {
-  await prisma.$disconnect()
-  console.error(e)
-})
+main().catch(async (e) => {
+  await prisma.$disconnect();
+  console.error(e);
+});

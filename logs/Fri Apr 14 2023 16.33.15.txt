@@ -1,0 +1,1 @@
+[Fri Apr 14 2023 16:33:15] Logger successfuly created.

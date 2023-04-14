@@ -112,6 +112,8 @@ model Currency {
 
   CurrencyRate         CurrencyRate[]
   SupplierProductPrice SupplierProductPrice[]
+  User                 User[]
+  Supplier             Supplier[]
 }
 
 model CurrencyRate {
@@ -147,15 +149,38 @@ model SupplierProductPrice {
 }
 
 model Supplier {
-  id                   Int                    @id(map: "Suppliers_pk") @unique(map: "Suppliers_supplier_id_key") @default(autoincrement())
-  name                 String
-  created_at           DateTime               @default(now())
-  updated_at           DateTime               @updatedAt
-  deleted_at           DateTime?
+  id                                    Int                    @id(map: "Suppliers_pk") @unique(map: "Suppliers_supplier_id_key") @default(autoincrement())
+  name                                  String
+  currency_id                           Int?
+  deliver_goods_yourself                Boolean                @default(false)
+  array_of_delivery_ids                 Int[]                  @default([])
+  created_at                            DateTime               @default(now())
+  updated_at                            DateTime               @updatedAt
+  deleted_at                            DateTime?
 
   SupplierProductPrice SupplierProductPrice[]
   CartProduct          CartProduct[]
   User                 User?
+  Address              Address[]
+  Currency             Currency?                               @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "currency_id")
+}
+
+enum DeliveryTypeEnum {
+  USER
+  SUPPLIER
+}
+
+model Delivery {
+  id                              Int                    @id @default(autoincrement())
+  name                            String                 @unique
+  type                            DeliveryTypeEnum
+  parent_id                       Int?
+  created_at                      DateTime               @default(now())
+  updated_at                      DateTime               @updatedAt
+  deleted_at                      DateTime?
+
+  Children                        Delivery[]             @relation(name: "DeliveryToDelivery")
+  Parent                          Delivery?              @relation(name: "DeliveryToDelivery", fields: [parent_id], references: [id])
 }
 
 enum CartType {
@@ -210,21 +235,51 @@ model Category {
 }
 
 model User {
-  id                   Int                    @id(map: "user_pk") @unique(map: "user_id_uindex") @default(autoincrement())
-  name                 String
-  user_name            String?                @unique
-  document_id          Int?                   @unique
-  supplier_id          Int?                   @unique
-  email                String                 @unique(map: "user_email_uindex")
-  password             String
-  created_at           DateTime               @default(now())
-  updated_at           DateTime               @updatedAt
-  deleted_at           DateTime?
+  id                       Int                    @id(map: "user_pk") @unique(map: "user_id_uindex") @default(autoincrement())
+  name                     String
+  user_name                String?                @unique
+  document_id              Int?                   @unique
+  supplier_id              Int?                   @unique
+  currency_id              Int?
+  array_of_delivery_ids    Int[]                  @default([])
+  email                    String                 @unique(map: "user_email_uindex")
+  password                 String
+  created_at               DateTime               @default(now())
+  updated_at               DateTime               @updatedAt
+  deleted_at               DateTime?
 
-  Supplier             Supplier?              @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "supplier_id")
-  Cart                 Cart[]
-  Profile              Profile?
-  UserRole             UserRole[]
+  Supplier                 Supplier?              @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "supplier_id")
+  Cart                     Cart[]
+  Profile                  Profile?
+  UserRole                 UserRole[]
+  Address                  Address[]
+  Currency                 Currency?              @relation(fields: [currency_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "currency_id")
+}
+
+model Address {
+  id                             Int                    @id(map: "address_pk") @unique(map: "address_id_uindex") @default(autoincrement())
+  user_id                        Int
+  supplier_id                    Int?
+  type                           AddressType            @default(DELIVERY)
+  name                           String
+  postcode                       Int?
+  country                        String
+  region                         String
+  city                           String
+  street                         String
+  house_number                   Int
+  apartment_number_or_office     Int?
+  created_at                     DateTime               @default(now())
+  updated_at                     DateTime               @updatedAt
+  deleted_at                     DateTime?
+
+  User                           User                   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_id")
+  Supplier                       Supplier?              @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "supplier_id")
+}
+
+enum AddressType {
+  DELIVERY
+  WAREHOUSE
 }
 
 model Profile {

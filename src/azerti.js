@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 
 async function parse() {
   const file = fs.createReadStream(
-    path.join(__dirname, "../", "vendor", "al-style.csv")
+    path.join(__dirname, "../", "vendor", "azerti.csv")
   );
   let count = 0;
   let countProducts = 0;
@@ -20,10 +20,10 @@ async function parse() {
   await prisma.$queryRaw`SELECT setval('"Supplier_id_seq"', (SELECT MAX(id) FROM "Supplier"));`
 
   let supplierDB = await prisma.supplier.findFirst({
-    where: { name: "Al-Style" },
+    where: { name: "Azerti" },
   });
   if (!supplierDB) {
-    supplierDB = await prisma.supplier.create({ data: { name: "Al-Style" } });
+    supplierDB = await prisma.supplier.create({ data: { name: "Azerti" } });
   }
   let currencyDB = await prisma.currency.findFirst({ where: { name: "usd" } });
   if (!currencyDB) {
@@ -39,6 +39,7 @@ async function parse() {
     process.exit(0);
   }
 
+  const vendorsDB = await prisma.vendor.findMany()
   const unknownVendorDB = await prisma.vendor.findFirst({where: {name: "Unknown"}})
 
   const r = await prisma.supplierProductPrice.deleteMany({
@@ -59,10 +60,8 @@ async function parse() {
             supplier_partnumber: data[0],
             vendor_partnumber: data[1],
             title: data[2],
-            fullTitle: data[3],
             price: data[4],
-            category: "",
-            vendor: "",
+            vendor_id: null,
             desc: ""
           };
 
@@ -70,17 +69,18 @@ async function parse() {
             !result.supplier_partnumber.length > 0 ||
             !result.vendor_partnumber.length > 0 ||
             !result.price.length > 0 ||
-            !data[0].match(/^[0-9]+$/gm)
+            !data[0].trim().match(/^[0-9]+$/gm)
           ) return;
-
+          result.price = result.price.replace(",", "")
           result.price = Math.ceil(parseFloat(result.price) * 0.002206 * 100) / 100;
-          result.category = result.fullTitle.split(",")[0].trim()
-          result.vendor = (result.fullTitle.split(",")[1]?.trim())
-          result.desc = result.fullTitle.split(", ").slice(2).join(", ").trim()
+          result.desc = result.title.split(", ").slice(1).join(", ")
+          result.title = result.title.split(",")[0]
 
-          if (result.vendor) {
-            result.vendor = result.vendor.toUpperCase()
-          } else return
+          for (const vendor of vendorsDB) {
+            if (result.title.toLowerCase().includes(vendor.name.toLowerCase())) {
+              result.vendor_id = vendor.id
+            }
+          }
 
           let productDB = await prisma.product.findFirst({
             where: { vendor_partnumber: result.vendor_partnumber },
@@ -92,26 +92,25 @@ async function parse() {
             }})
 
             let categoryDB = await prisma.category.findFirst({
-              where: { name: result.category },
+              where: { name: "Unknown" },
             });
 
-            if (!categoryDB)
-              categoryDB = await prisma.category.findFirst({
-                where: { name: "Unknown" },
+            let vendorDB = undefined;
+            if (result.vendor_id) {
+              vendorDB = await prisma.vendor.findFirst({
+                where: { id: result.vendor_id },
               });
+            }
 
-            let vendorDB = await prisma.vendor.findFirst({
-              where: { name: result.vendor },
-            });
-            if (!vendorDB) vendorDB = unknownVendorDB
-            
+            if (!vendorDB) vendorDB = unknownVendorDB;
+
             productDB = await prisma.product.create({
               data: {
                 vendor_id: vendorDB.id,
                 vendor_partnumber: result.vendor_partnumber,
                 name: result.title,
                 category_id: categoryDB.id,
-                description_id: descriptionDB.id
+                description_id: descriptionDB.id,
               },
             });
 
