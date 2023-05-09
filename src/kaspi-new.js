@@ -90,14 +90,10 @@ async function parse() {
             });
 
             countProducts++
+            console.log(productDB.vendor_partnumber)
           }
 
           if (productDB) {
-            await prisma.supplierProductPrice.updateMany({
-              where: { product_id: productDB.id, supplier_id: supplierDB.id },
-              data: { deleted_at: new Date() }
-            })
-
             const supplierProductPrice = await prisma.supplierProductPrice.create({
               data: {
                 product_id: productDB.id,

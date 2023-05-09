@@ -1,2 +1,0 @@
-[Fri Apr 14 2023 14:29:07] Logger successfuly created.
-[Fri Apr 14 2023 14:29:07] Seed database first!
